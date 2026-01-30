@@ -18,6 +18,19 @@ def create_task(
     session: Session = Depends(get_session),
 ) -> Task:
     """Create a new task for the authenticated user."""
+    # Check for duplicate title for the same user
+    existing_task = session.exec(
+        select(Task).where(
+            Task.user_id == current_user.id,
+            Task.title == task_data.title
+        )
+    ).first()
+    if existing_task:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A task with the title '{task_data.title}' already exists",
+        )
+
     task = Task(
         user_id=current_user.id,  # Use authenticated user ID from token
         title=task_data.title,
