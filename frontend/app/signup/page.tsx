@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { signUp } from "@/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -38,32 +38,15 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const result = await signUp.email({
-        email,
-        password,
-        name: email.split("@")[0],
-      });
-
-      if (result.error) {
-        if (
-          result.error.message?.includes("already exists") ||
-          result.error.code === "USER_ALREADY_EXISTS"
-        ) {
-          setError("An account with this email already exists");
-        } else {
-          setError(result.error.message || "Failed to create account");
-        }
-        return;
-      }
-
-      if (result.data?.token) {
-        localStorage.setItem("auth_token", result.data.token);
-      }
-
+      await authClient.signup(email, password, email.split("@")[0]);
       await refreshUser();
       router.push("/tasks");
-    } catch {
-      setError("Failed to create account. Please try again.");
+    } catch (err: any) {
+      if (err.message?.includes("already registered")) {
+        setError("An account with this email already exists");
+      } else {
+        setError(err.message || "Failed to create account. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

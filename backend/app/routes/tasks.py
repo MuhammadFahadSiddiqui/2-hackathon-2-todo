@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
@@ -38,6 +38,8 @@ def create_task(
         is_completed=False,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
+        deadline_at=task_data.deadline_at,
+        reminder_interval_minutes=task_data.reminder_interval_minutes,
     )
     session.add(task)
     session.commit()
@@ -54,6 +56,39 @@ def list_tasks(
     statement = select(Task).where(Task.user_id == current_user.id)
     tasks = session.exec(statement).all()
     return list(tasks)
+
+
+@router.get("/due-reminders", response_model=List[TaskResponse])
+def get_due_reminders(
+    current_user: UserContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> List[Task]:
+    """Get pending tasks that need reminders shown."""
+    now = datetime.utcnow()
+
+    # Get pending tasks with reminder settings
+    statement = select(Task).where(
+        Task.user_id == current_user.id,
+        Task.is_completed == False,
+        Task.reminder_interval_minutes != None,
+    )
+    tasks = session.exec(statement).all()
+
+    due_tasks = []
+    for task in tasks:
+        # Check if reminder is due based on interval
+        if task.last_reminded_at is None:
+            # Never shown, show if task has been created
+            due_tasks.append(task)
+        else:
+            # Check if enough time has passed since last reminder
+            next_reminder_time = task.last_reminded_at + timedelta(
+                minutes=task.reminder_interval_minutes
+            )
+            if now >= next_reminder_time:
+                due_tasks.append(task)
+
+    return due_tasks
 
 
 @router.get("/{task_id}", response_model=TaskResponse)
@@ -94,6 +129,8 @@ def update_task(
         )
     task.title = task_data.title
     task.description = task_data.description
+    task.deadline_at = task_data.deadline_at
+    task.reminder_interval_minutes = task_data.reminder_interval_minutes
     task.updated_at = datetime.utcnow()
     session.add(task)
     session.commit()
@@ -163,6 +200,29 @@ def toggle_task_status(
         )
     task.is_completed = not task.is_completed
     task.updated_at = datetime.utcnow()
+    session.add(task)
+    session.commit()
+    session.refresh(task)
+    return task
+
+
+@router.patch("/{task_id}/acknowledge-reminder", response_model=TaskResponse)
+def acknowledge_reminder(
+    task_id: int,
+    current_user: UserContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> Task:
+    """Mark a task's reminder as acknowledged to prevent spamming."""
+    statement = select(Task).where(
+        Task.id == task_id, Task.user_id == current_user.id
+    )
+    task = session.exec(statement).first()
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+    task.last_reminded_at = datetime.utcnow()
     session.add(task)
     session.commit()
     session.refresh(task)

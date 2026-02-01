@@ -37,9 +37,14 @@ async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const error = new Error(`API Error: ${response.status}`) as Error & {
-      status: number;
-    };
+    let message = `API Error: ${response.status}`;
+    try {
+      const body = await response.json();
+      message = body.detail || body.message || message;
+    } catch {
+      // Response body not JSON, use status message
+    }
+    const error = new Error(message) as Error & { status: number };
     error.status = response.status;
     throw error;
   }
@@ -54,10 +59,24 @@ async function apiRequest<T>(
 /**
  * Task API methods
  */
+export interface TaskCreateData {
+  title: string;
+  description?: string;
+  deadline_at?: string;
+  reminder_interval_minutes?: number;
+}
+
+export interface TaskUpdateData {
+  title: string;
+  description?: string;
+  deadline_at?: string | null;
+  reminder_interval_minutes?: number | null;
+}
+
 export const tasksApi = {
   list: () => apiRequest<Task[]>("/api/tasks"),
 
-  create: (data: { title: string; description?: string }) =>
+  create: (data: TaskCreateData) =>
     apiRequest<Task>("/api/tasks", {
       method: "POST",
       body: JSON.stringify(data),
@@ -65,7 +84,7 @@ export const tasksApi = {
 
   get: (id: number) => apiRequest<Task>(`/api/tasks/${id}`),
 
-  update: (id: number, data: { title: string; description?: string }) =>
+  update: (id: number, data: TaskUpdateData) =>
     apiRequest<Task>(`/api/tasks/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
@@ -83,6 +102,13 @@ export const tasksApi = {
 
   toggleStatus: (id: number) =>
     apiRequest<Task>(`/api/tasks/${id}/toggle-status`, {
+      method: "PATCH",
+    }),
+
+  getDueReminders: () => apiRequest<Task[]>("/api/tasks/due-reminders"),
+
+  acknowledgeReminder: (id: number) =>
+    apiRequest<Task>(`/api/tasks/${id}/acknowledge-reminder`, {
       method: "PATCH",
     }),
 };
@@ -103,6 +129,9 @@ export interface Task {
   is_completed: boolean;
   created_at: string;
   updated_at: string;
+  deadline_at: string | null;
+  reminder_interval_minutes: number | null;
+  last_reminded_at: string | null;
 }
 
 export interface User {

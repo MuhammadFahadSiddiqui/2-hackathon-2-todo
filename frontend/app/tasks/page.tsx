@@ -8,6 +8,7 @@ import { TaskItem } from "@/components/TaskItem";
 import { TaskSkeleton } from "@/components/TaskSkeleton";
 import { TaskHistory } from "@/components/TaskHistory";
 import { ErrorBanner, getErrorMessage } from "@/components/ErrorBanner";
+import { ReminderBanner } from "@/components/ReminderBanner";
 import { addHistoryEntry } from "@/lib/task-history";
 
 export default function TasksPage() {
@@ -17,9 +18,15 @@ export default function TasksPage() {
   // T030: Task and editing state
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDeadline, setNewTaskDeadline] = useState("");
+  const [newTaskReminderInterval, setNewTaskReminderInterval] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  // Reminders state
+  const [reminders, setReminders] = useState<Task[]>([]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -34,10 +41,11 @@ export default function TasksPage() {
     }
   }, [isAuthenticated, router]);
 
-  // Load tasks
+  // Load tasks and reminders
   useEffect(() => {
     if (isAuthenticated === true) {
       loadTasks();
+      loadReminders();
     }
   }, [isAuthenticated]);
 
@@ -52,6 +60,23 @@ export default function TasksPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadReminders = async () => {
+    try {
+      const data = await tasksApi.getDueReminders();
+      setReminders(data);
+    } catch (err) {
+      console.error("Failed to load reminders:", err);
+    }
+  };
+
+  const handleDismissReminder = (taskId: number) => {
+    setReminders(reminders.filter((r) => r.id !== taskId));
+  };
+
+  const handleDismissAllReminders = () => {
+    setReminders([]);
   };
 
   // Filter tasks based on search query
@@ -69,9 +94,25 @@ export default function TasksPage() {
     if (!trimmedTitle) return;
 
     try {
-      const task = await tasksApi.create({ title: trimmedTitle });
+      const createData: {
+        title: string;
+        deadline_at?: string;
+        reminder_interval_minutes?: number;
+      } = { title: trimmedTitle };
+
+      if (newTaskDeadline) {
+        createData.deadline_at = new Date(newTaskDeadline).toISOString();
+      }
+      if (newTaskReminderInterval) {
+        createData.reminder_interval_minutes = parseInt(newTaskReminderInterval, 10);
+      }
+
+      const task = await tasksApi.create(createData);
       setTasks([...tasks, task]);
       setNewTaskTitle("");
+      setNewTaskDeadline("");
+      setNewTaskReminderInterval("");
+      setShowAdvanced(false);
       setError(null);
       // Log to history
       addHistoryEntry("created", task.id, task.title);
@@ -255,6 +296,13 @@ export default function TasksPage() {
           </div>
         )}
 
+        {/* Reminder notifications */}
+        <ReminderBanner
+          reminders={reminders}
+          onDismiss={handleDismissReminder}
+          onDismissAll={handleDismissAllReminders}
+        />
+
         {/* Create task form */}
         <form
           onSubmit={handleCreateTask}
@@ -288,6 +336,27 @@ export default function TasksPage() {
               className="flex-1 bg-transparent px-2 py-2 text-[var(--foreground)] placeholder-[var(--muted-light)] focus:outline-none"
             />
             <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="rounded-lg p-2 text-[var(--muted)] transition-colors hover:bg-[var(--card-border)] hover:text-[var(--foreground)]"
+              aria-label="Toggle reminder options"
+              title="Set deadline & reminder"
+            >
+              <svg
+                className={`h-5 w-5 transition-transform ${showAdvanced ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </button>
+            <button
               type="submit"
               disabled={!newTaskTitle.trim()}
               className="rounded-lg bg-gradient-to-r from-[var(--secondary-purple)] to-[var(--secondary-purple-hover)] px-5 py-2.5 font-semibold text-white shadow-md shadow-[var(--secondary-purple)]/25 transition-all hover:shadow-lg hover:shadow-[var(--secondary-purple)]/30 disabled:cursor-not-allowed disabled:opacity-50"
@@ -295,6 +364,50 @@ export default function TasksPage() {
               Add Task
             </button>
           </div>
+          {/* Advanced options: deadline & reminder */}
+          {showAdvanced && (
+            <div className="border-t border-[var(--card-border)] bg-[var(--background)]/50 px-4 py-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="deadline"
+                    className="mb-1 block text-sm font-medium text-[var(--muted)]"
+                  >
+                    Deadline
+                  </label>
+                  <input
+                    id="deadline"
+                    type="datetime-local"
+                    value={newTaskDeadline}
+                    onChange={(e) => setNewTaskDeadline(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary-yellow)] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="reminder"
+                    className="mb-1 block text-sm font-medium text-[var(--muted)]"
+                  >
+                    Remind every
+                  </label>
+                  <select
+                    id="reminder"
+                    value={newTaskReminderInterval}
+                    onChange={(e) => setNewTaskReminderInterval(e.target.value)}
+                    className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary-yellow)] focus:outline-none"
+                  >
+                    <option value="">No reminder</option>
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="240">4 hours</option>
+                    <option value="1440">1 day</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
         </form>
 
         {/* Search Bar */}

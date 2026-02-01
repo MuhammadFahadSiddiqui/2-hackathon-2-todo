@@ -15,3 +15,7 @@ class Task(SQLModel, table=True):
     is_completed: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    # Reminder fields (column names match database)
+    deadline_at: Optional[datetime] = Field(default=None, sa_column_kwargs={"name": "deadline_at"})
+    reminder_interval_minutes: Optional[int] = Field(default=None)
+    last_reminded_at: Optional[datetime] = Field(default=None, sa_column_kwargs={"name": "last_reminded_at"})

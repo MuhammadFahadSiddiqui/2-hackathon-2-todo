@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { signIn } from "@/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 
 function LoginForm() {
   const router = useRouter();
@@ -35,25 +35,11 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const result = await signIn.email({
-        email,
-        password,
-      });
-
-      if (result.error) {
-        setError("Invalid email or password");
-        return;
-      }
-
-      // Store token for backend API calls
-      if (result.data?.token) {
-        localStorage.setItem("auth_token", result.data.token);
-      }
-
+      await authClient.login(email, password);
       await refreshUser();
       router.push("/tasks");
-    } catch {
-      setError("Invalid email or password");
+    } catch (err: any) {
+      setError(err.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
