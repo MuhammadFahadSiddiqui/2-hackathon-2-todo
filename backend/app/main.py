@@ -22,9 +22,19 @@ app = FastAPI(
 
 # CORS middleware configuration
 settings = get_settings()
+
+# Allow multiple origins (production + local development)
+allowed_origins = [settings.frontend_url]
+# Add localhost for development if not already included
+if "localhost" not in settings.frontend_url:
+    allowed_origins.extend([
+        "http://localhost:3000",
+        "http://localhost:3001"
+    ])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*", "Authorization"],

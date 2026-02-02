@@ -1,0 +1,51 @@
+# Railway Ignore - Files to exclude from deployment
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment Files
+.env
+.env.local
+
+# Migration Scripts (run these locally first)
+add_reminder_columns.py
+fix_task_schema.py
+fix_tasks_schema.py
+create_auth_table.py
+
+# Development Files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Documentation
+README.md
+DEPLOYMENT.md
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Backup Files
+*.bak
+*_old.py
+*_backup.py

@@ -1,11 +1,12 @@
 """JWT token generation and validation."""
 from datetime import datetime, timedelta
 from typing import Optional
+import os
 import jwt
 
 
-# Use a consistent secret key
-JWT_SECRET = "your-secret-key-change-in-production-12345"
+# Use environment variable for production, fallback for development
+JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production-12345")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 168  # 7 days
 
